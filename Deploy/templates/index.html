@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chest CT-Scan Classification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            display: none;
+        }
+        #preview {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 15px auto;
+            display: block;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .confidence-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            border-radius: 5px;
+            transition: width 0.5s;
+        }
+        .probabilities {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chest CT-Scan Classification</h1>
+    
+    <div class="container">
+        <h2>Upload an Image</h2>
+        <p>Upload a chest CT scan image to classify it.</p>
+        
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="file" accept="image/*">
+            <button type="submit" class="btn">Classify Image</button>
+        </form>
+        
+        <div class="loader" id="loader"></div>
+        
+        <div id="result">
+            <h3>Classification Result</h3>
+            <img id="preview" src="" alt="Image preview">
+            <p>Predicted Class: <strong id="predicted-class"></strong></p>
+            <p>Confidence: <strong id="confidence"></strong></p>
+            <div class="confidence-bar" id="confidence-bar"></div>
+            
+            <div class="probabilities">
+                <h4>All Probabilities:</h4>
+                <ul id="all-probabilities"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file to upload');
+                return;
+            }
+            
+            // Show loader
+            document.getElementById('loader').style.display = 'block';
+            // Hide previous results
+            document.getElementById('result').style.display = 'none';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Display image preview
+                const preview = document.getElementById('preview');
+                preview.src = URL.createObjectURL(file);
+                
+                // Set results
+                document.getElementById('predicted-class').textContent = data.predicted_class;
+                
+                const confidence = (data.confidence * 100).toFixed(2);
+                document.getElementById('confidence').textContent = confidence + '%';
+                
+                const confidenceBar = document.getElementById('confidence-bar');
+                confidenceBar.style.width = confidence + '%';
+                confidenceBar.textContent = confidence + '%';
+                
+                // Set all probabilities
+                const probList = document.getElementById('all-probabilities');
+                probList.innerHTML = '';
+                
+                for (const className in data.all_probabilities) {
+                    const prob = (data.all_probabilities[className] * 100).toFixed(2);
+                    const li = document.createElement('li');
+                    li.textContent = `${className}: ${prob}%`;
+                    probList.appendChild(li);
+                }
+                
+                // Show results
+                document.getElementById('result').style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('loader').style.display = 'none';
+                alert('Error: ' + error);
+            });
+        });
+    </script>
+</body>
+</html>
