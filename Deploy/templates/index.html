@@ -1,60 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+    <title>Chest CT Scan Classification</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chest CT-Scan Classification</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            line-height: 1.6;
         }
         h1 {
             color: #333;
             text-align: center;
         }
         .container {
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 20px;
-            margin-top: 20px;
             background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .btn {
+        .upload-section {
+            margin-bottom: 20px;
+        }
+        #upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #file-input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
             background-color: #4CAF50;
             color: white;
-            padding: 10px 15px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
         }
-        .btn:hover {
+        button:hover {
             background-color: #45a049;
         }
-        #result {
+        #results {
             margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: white;
             display: none;
         }
-        #preview {
-            max-width: 300px;
-            max-height: 300px;
-            margin: 15px auto;
-            display: block;
+        #image-preview {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .result-item {
+            margin-bottom: 5px;
+        }
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #f3f3f3;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            height: 20px;
+            border-radius: 10px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
         }
         .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 20px;
+            height: 20px;
             animation: spin 2s linear infinite;
             margin: 20px auto;
             display: none;
@@ -63,44 +87,31 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .confidence-bar {
-            height: 20px;
-            background-color: #4CAF50;
-            text-align: center;
-            line-height: 20px;
-            color: white;
-            border-radius: 5px;
-            transition: width 0.5s;
-        }
-        .probabilities {
-            margin-top: 15px;
-        }
     </style>
 </head>
 <body>
-    <h1>Chest CT-Scan Classification</h1>
-    
     <div class="container">
-        <h2>Upload an Image</h2>
-        <p>Upload a chest CT scan image to classify it.</p>
+        <h1>Chest CT Scan Classification</h1>
         
-        <form id="upload-form" enctype="multipart/form-data">
-            <input type="file" id="file-input" name="file" accept="image/*">
-            <button type="submit" class="btn">Classify Image</button>
-        </form>
+        <div class="upload-section">
+            <h2>Upload a CT Scan Image</h2>
+            <form id="upload-form">
+                <input type="file" id="file-input" accept=".jpg,.jpeg,.png">
+                <button type="submit">Analyze Image</button>
+            </form>
+            <div class="loader" id="loader"></div>
+        </div>
         
-        <div class="loader" id="loader"></div>
-        
-        <div id="result">
-            <h3>Classification Result</h3>
-            <img id="preview" src="" alt="Image preview">
-            <p>Predicted Class: <strong id="predicted-class"></strong></p>
-            <p>Confidence: <strong id="confidence"></strong></p>
-            <div class="confidence-bar" id="confidence-bar"></div>
+        <div id="results">
+            <h2>Results</h2>
+            <img id="image-preview" src="" alt="Uploaded Image">
             
-            <div class="probabilities">
-                <h4>All Probabilities:</h4>
-                <ul id="all-probabilities"></ul>
+            <div id="prediction-result">
+                <h3>Predicted Class: <span id="predicted-class"></span></h3>
+                <p>Confidence: <span id="confidence"></span>%</p>
+                
+                <h3>Class Probabilities:</h3>
+                <div id="probabilities-container"></div>
             </div>
         </div>
     </div>
@@ -113,14 +124,14 @@
             const file = fileInput.files[0];
             
             if (!file) {
-                alert('Please select a file to upload');
+                alert('Please select a file');
                 return;
             }
             
             // Show loader
             document.getElementById('loader').style.display = 'block';
-            // Hide previous results
-            document.getElementById('result').style.display = 'none';
+            // Hide results if they were previously shown
+            document.getElementById('results').style.display = 'none';
             
             const formData = new FormData();
             formData.append('file', file);
@@ -129,49 +140,64 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 // Hide loader
                 document.getElementById('loader').style.display = 'none';
                 
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
+                // Display the image
+                const imagePreview = document.getElementById('image-preview');
+                imagePreview.src = URL.createObjectURL(file);
                 
-                // Display image preview
-                const preview = document.getElementById('preview');
-                preview.src = URL.createObjectURL(file);
+                // Display prediction results
+                document.getElementById('predicted-class').textContent = data.class;
+                document.getElementById('confidence').textContent = (data.confidence * 100).toFixed(2);
                 
-                // Set results
-                document.getElementById('predicted-class').textContent = data.predicted_class;
+                // Display probabilities
+                const probContainer = document.getElementById('probabilities-container');
+                probContainer.innerHTML = '';
                 
-                const confidence = (data.confidence * 100).toFixed(2);
-                document.getElementById('confidence').textContent = confidence + '%';
-                
-                const confidenceBar = document.getElementById('confidence-bar');
-                confidenceBar.style.width = confidence + '%';
-                confidenceBar.textContent = confidence + '%';
-                
-                // Set all probabilities
-                const probList = document.getElementById('all-probabilities');
-                probList.innerHTML = '';
-                
-                for (const className in data.all_probabilities) {
-                    const prob = (data.all_probabilities[className] * 100).toFixed(2);
-                    const li = document.createElement('li');
-                    li.textContent = `${className}: ${prob}%`;
-                    probList.appendChild(li);
-                }
+                Object.entries(data.probabilities).forEach(([className, probability]) => {
+                    const percentage = (probability * 100).toFixed(2);
+                    const progressContainer = document.createElement('div');
+                    progressContainer.className = 'progress-container';
+                    
+                    const progressBar = document.createElement('div');
+                    progressBar.className = 'progress-bar';
+                    progressBar.style.width = `${percentage}%`;
+                    progressBar.style.backgroundColor = getBarColor(probability);
+                    progressBar.textContent = `${percentage}%`;
+                    
+                    progressContainer.appendChild(progressBar);
+                    
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item';
+                    resultItem.innerHTML = `<strong>${className}</strong>`;
+                    
+                    probContainer.appendChild(resultItem);
+                    probContainer.appendChild(progressContainer);
+                });
                 
                 // Show results
-                document.getElementById('result').style.display = 'block';
+                document.getElementById('results').style.display = 'block';
             })
             .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Please try again.');
                 document.getElementById('loader').style.display = 'none';
-                alert('Error: ' + error);
             });
         });
+        
+        function getBarColor(probability) {
+            if (probability > 0.7) return '#4CAF50'; // Green
+            if (probability > 0.3) return '#FFC107'; // Yellow
+            return '#F44336'; // Red
+        }
     </script>
 </body>
 </html>
