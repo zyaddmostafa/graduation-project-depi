@@ -12,7 +12,7 @@ import json
 app = Flask(__name__)
 
 # Configuration
-MODEL_PATH = "chest.ipynb/chest-ctscan_model.pth"
+MODEL_PATH = "chest.ipynb/best_model.pth"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
