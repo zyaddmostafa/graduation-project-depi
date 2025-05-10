@@ -103,11 +103,6 @@ def predict():
         
         # Make prediction
         result = predict_image(image, model)
-        
-        # Save file (optional)
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        image.save(file_path)
-        
         return jsonify(result)
     
     return jsonify({'error': 'Invalid file type'}), 400
